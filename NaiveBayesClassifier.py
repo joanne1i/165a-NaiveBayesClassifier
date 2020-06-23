@@ -1,102 +1,56 @@
 import numpy as np
 import sys
 import time
-import resource
 
-
-# returns file's documents
+# returns all documents of file 
 def getReviews(filename):
+    count = 0
     reviews = []
-    temp = []
     with open(filename, 'r') as fp:
         for line in fp:
             arr = line.split(" ,", 1)
-            temp = [b for b in zip(arr[0].split(" ")[:-1], arr[0].split(" ")[1:])]
-            # for b in zip(arr[0].split(" ")[:-1], arr[0].split(" ")[1:]):
-            #     temp.append(b)
-            reviews.append(temp)
-            temp = []
+            arr = arr[0].split(" ")
+            reviews.append(arr)
+            count += 1
+    # print(reviews, count)
     return reviews
-
-def getSeparateReviews(filename):
-    pos_count = 0
-    neg_count = 0
-    pos_reviews = []
-    neg_reviews = []
-    n_temp = []
-    p_temp = []
-    with open(filename, 'r') as fp:
-        for line in fp:
-            arr = line.split(" ,", 1)
-            if('0' in arr[1]):
-                neg_count += 1
-                n_temp = [b for b in zip(arr[0].split(" ")[:-1], arr[0].split(" ")[1:])]
-                neg_reviews.append(n_temp)
-                n_temp = []
-            else:
-                pos_count += 1
-                p_temp = [b for b in zip(arr[0].split(" ")[:-1], arr[0].split(" ")[1:])]
-                pos_reviews.append(p_temp)            
-                p_temp = [] 
-    return neg_reviews, neg_count, pos_reviews, pos_count
-    
-# return each label's documents without stop words
-# def getSeparateReviews(filename):
-#     pos_count= 0
-#     neg_count = 0
-#     pos_reviews = []
-#     neg_reviews = []
-#     pos_reviews_t = []
-#     neg_reviews_t = []
-#     n_temp = []
-#     p_temp = []
-#     with open(filename, 'r') as fp:
-#         for line in fp:
-#             arr = line.split(" ,", 1)
-#             if('0' in arr[1]):
-#                 neg_reviews_t.append(arr[0])
-#                 neg_count += 1
-#             else:
-#                 pos_reviews_t.append(arr[0])
-#                 pos_count += 1
-#     for l in neg_reviews_t:
-#         for b in zip(l.split(" ")[:-1], l.split(" ")[1:]):
-#             n_temp.append(b)
-#         neg_reviews.append(n_temp)
-#         n_temp = []
-#     for l in pos_reviews_t:
-#         for b in zip(l.split(" ")[:-1], l.split(" ")[1:]):
-#             p_temp.append(b)
-#         pos_reviews.append(p_temp)            
-#         p_temp = []
-#     return neg_reviews, neg_count, pos_reviews, pos_count
-
 
 # returns all labels of file
 def getLabels(filename):
+    labels = []
+    count = 0
     with open(filename, 'r') as fp:
         for line in fp:
             if('0' in line):
-                yield 0
+                labels.append(0)
             elif('1' in line):
-                yield 1
+                labels.append(1)
+    return labels
 
-# def getLabels(filename):
-#     labels = []
-#     with open(filename, 'r') as fp:
-#         for line in fp:
-#             if('0' in line):
-#              labels.append(0)
-#                 # yield 0
-#             elif('1' in line):
-#                 labels.append(1)
-#                 # yield 1
-#     return labels
+def getSeparateReviews(filename):
+    pos_count= 0
+    neg_count = 0
+    pos_reviews = []
+    neg_reviews = []
+    with open(filename, 'r') as fp:
+        for line in fp:
+            if('0' in line):
+                arr = line.split(" ,", 1)
+                arr = arr[0].split(" ")
+                neg_reviews.append(arr)
+                neg_count += 1
+            else:
+                arr = line.split(" ,", 1)
+                arr = arr[0].split(" ")
+                pos_reviews.append(arr)
+                pos_count += 1
+    # print(reviews, count)
+    return neg_reviews, neg_count, pos_reviews, pos_count
+
 
 # turns 2d list into 1d
 def flatlist(list):
     newList = []
-    # newList = [i for sublist in list for i in sublist]
     for sublist in list:
         for i in sublist:
             newList.append(i)
@@ -112,20 +66,19 @@ def getDict(reviews):
 # vocabulary = total number of all unique words in file
 def getVocabCount(filename):
     combined_vocab_count = 0
-    combined_vocab = getReviews(filename)        
-    combined_vocab_flat = flatlist(combined_vocab)        
+    combined_vocab = getReviews(filename)
+    combined_vocab_flat = flatlist(combined_vocab)
     combined_dict = getDict(combined_vocab_flat)
     return len(combined_dict), combined_vocab
 
 # returns training documents w/ no label
 neg_reviews, neg_count, pos_reviews, pos_count = getSeparateReviews(sys.argv[1])
-# neg_reviews, neg_count, pos_reviews, pos_count = getSeparateReviews("train.txt")
 
 def prior_probability(neg_count, pos_count):
     # calculate prior probabilities for each label first
     total_docs = neg_count + pos_count
-    neg_prior = np.abs(float(neg_count/total_docs))
-    pos_prior = np.abs(float(pos_count/total_docs))
+    neg_prior = np.abs(neg_count/total_docs)
+    pos_prior = np.abs(pos_count/total_docs)
     return neg_prior, pos_prior
 
 def getLabelDict(neg_reviews, pos_reviews):
@@ -136,7 +89,6 @@ def getLabelDict(neg_reviews, pos_reviews):
     return neg_dict, pos_dict
 
 neg_dict, pos_dict = getLabelDict(neg_reviews, pos_reviews)
-
 # sum of total word counts in dict 
 n = 0
 pn = 0
@@ -148,7 +100,7 @@ for w, count in pos_dict.items():
     pn += count
 pos_n = pn
 
-def conditional_probability(label, word, vocab):
+def conditional_probability(label, word, filename, vocab):
     alpha = 1
     # using training dictionary to find cond prob
     if(label == 0):
@@ -163,7 +115,7 @@ def conditional_probability(label, word, vocab):
     cond_prob = np.log(float(nk + alpha)/(n + alpha*np.abs(vocab)))
     return cond_prob
 
-def classify(filename):
+def classify(filename, neg_reviews, neg_count, pos_reviews, pos_count):
     C = [0, 1]
     vocab, documents = getVocabCount(filename)
     correct = 0
@@ -178,8 +130,7 @@ def classify(filename):
             # for each word in document
             for word in document:
                 # get the probability sum of the whole document
-                # print(word)
-                prob_sum += conditional_probability(cj, word, vocab)
+                prob_sum += conditional_probability(cj, word, filename, vocab)
             if(cj == 0):
                 neg_total = np.log1p(neg_prior) + prob_sum
             else:
@@ -188,22 +139,20 @@ def classify(filename):
             cnb = 0
         else:
             cnb = 1
-        # if(cnb == real_labels[index]):
-        if(cnb == next(real_labels)):
+        if(cnb == real_labels[index]):
             correct += 1
         else:
             incorrect += 1
-        # if(filename != sys.argv[1]):
-            # print(cnb)
+        if(filename != sys.argv[1]):
+            print(cnb)
     return (correct/float(correct + incorrect))
 
-# classify("train.txt")
 start_time = time.time()         
-train = classify(sys.argv[1])
+train = classify(sys.argv[1], neg_reviews, neg_count, pos_reviews, pos_count)
 train_t = int(time.time() - start_time)
 
 start_time = time.time()         
-test = classify(sys.argv[2])
+test = classify(sys.argv[2], neg_reviews, neg_count, pos_reviews, pos_count)
 test_t = int(time.time() - start_time)
 
 
@@ -213,4 +162,3 @@ print("{} seconds (labeling)".format(test_t))
 print("{:.3f} (training)".format(train))
 print("{:.3f} (testing)".format(test))
 
-print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
